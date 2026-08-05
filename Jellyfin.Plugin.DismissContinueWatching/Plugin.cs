@@ -47,19 +47,24 @@ public class DismissContinueWatchingPlugin : BasePlugin<PluginConfiguration>, IH
     /// <summary>
     /// Registers the JavaScript with the JavaScript Injector plugin.
     /// </summary>
-    public void RegisterJavascript()
+    /// <returns><c>true</c> when registration succeeded; otherwise <c>false</c>.</returns>
+    public bool RegisterJavascript()
     {
         try
         {
             Assembly? jsInjectorAssembly = AssemblyLoadContext.All
                 .SelectMany(x => x.Assemblies)
-                .FirstOrDefault(x => x.FullName?.Contains("Jellyfin.Plugin.JavaScriptInjector", StringComparison.Ordinal) ?? false);
+                .FirstOrDefault(x =>
+                    string.Equals(
+                        x.GetName().Name,
+                        "Jellyfin.Plugin.JavaScriptInjector",
+                        StringComparison.Ordinal));
 
             if (jsInjectorAssembly is null)
             {
                 _logger.LogWarning(
-                    "JavaScript Injector plugin not found. Install it for the Continue Watching dismiss button to appear.");
-                return;
+                    "JavaScript Injector plugin not found yet. Install/enable it for the Continue Watching dismiss button.");
+                return false;
             }
 
             var customScriptPath = $"{Assembly.GetExecutingAssembly().GetName().Name}.Web.dismiss-continue-watching.js";
@@ -67,7 +72,7 @@ public class DismissContinueWatchingPlugin : BasePlugin<PluginConfiguration>, IH
             if (scriptStream is null)
             {
                 _logger.LogError("Could not find embedded script at path: {Path}", customScriptPath);
-                return;
+                return false;
             }
 
             using var reader = new StreamReader(scriptStream);
@@ -77,7 +82,7 @@ public class DismissContinueWatchingPlugin : BasePlugin<PluginConfiguration>, IH
             if (pluginInterfaceType is null)
             {
                 _logger.LogError("Could not find PluginInterface type in JavaScript Injector assembly.");
-                return;
+                return false;
             }
 
             var scriptRegistration = new JObject
@@ -97,15 +102,16 @@ public class DismissContinueWatchingPlugin : BasePlugin<PluginConfiguration>, IH
             if (registerResult is bool success && success)
             {
                 _logger.LogInformation("Successfully registered JavaScript with JavaScript Injector plugin.");
+                return true;
             }
-            else
-            {
-                _logger.LogWarning("Failed to register JavaScript with JavaScript Injector plugin.");
-            }
+
+            _logger.LogWarning("Failed to register JavaScript with JavaScript Injector plugin.");
+            return false;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to register JavaScript with JavaScript Injector plugin.");
+            return false;
         }
     }
 
@@ -116,7 +122,11 @@ public class DismissContinueWatchingPlugin : BasePlugin<PluginConfiguration>, IH
         {
             Assembly? jsInjectorAssembly = AssemblyLoadContext.All
                 .SelectMany(x => x.Assemblies)
-                .FirstOrDefault(x => x.FullName?.Contains("Jellyfin.Plugin.JavaScriptInjector", StringComparison.Ordinal) ?? false);
+                .FirstOrDefault(x =>
+                    string.Equals(
+                        x.GetName().Name,
+                        "Jellyfin.Plugin.JavaScriptInjector",
+                        StringComparison.Ordinal));
 
             if (jsInjectorAssembly is not null)
             {
