@@ -1,0 +1,86 @@
+<div data-role="page" class="page type-interior pluginConfigurationPage" data-controller="__plugin/Info.js">
+  <div class="content-primary" style="max-width: 53em">
+    <div class="verticalSection">
+      <div class="sectionTitleContainer">
+        <h2 class="sectionTitle">Dismiss Continue Watching</h2>
+      </div>
+    </div>
+
+    <div class="verticalSection">
+      <h3 class="sectionTitle">About</h3>
+      <p class="fieldDescription">
+        Adds a dismiss button on each item in the Continue Watching section. Clicking it marks the item as watched,
+        which removes it from Continue Watching.
+      </p>
+    </div>
+
+    <br />
+    <hr />
+    <br />
+
+    <div class="verticalSection">
+      <h3 class="sectionTitle">Requirements</h3>
+      <ul>
+        <li>
+          <a href="https://github.com/n00bcodr/Jellyfin-JavaScript-Injector" target="_blank" rel="noopener noreferrer">
+            Jellyfin JavaScript Injector
+          </a>
+          (required for the web UI button)
+        </li>
+        <li>
+          <a
+            href="https://github.com/IAmParadox27/jellyfin-plugin-file-transformation"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            File Transformation
+          </a>
+          (optional, recommended)
+        </li>
+      </ul>
+    </div>
+
+    <br />
+    <hr />
+    <br />
+
+    <div class="verticalSection">
+      <h3 class="sectionTitle">How it works</h3>
+      <p class="fieldDescription">
+        On hover, a close button appears on Continue Watching cards. The click calls Jellyfin's native
+        <code>PlayedItems</code> API for the current user, then removes the card from the page.
+      </p>
+      <p class="fieldDescription">
+        Supported on Jellyfin Web and official apps that use the web UI. Pure third-party clients are not supported.
+      </p>
+    </div>
+
+    <br />
+    <hr />
+    <br />
+
+    <div class="verticalSection">
+      <h3 class="sectionTitle">Resources</h3>
+      <ul>
+        <li>
+          <a
+            href="https://github.com/KuyaPollio/jellyfin-plugin-dismiss-continue-watching"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub Repository
+          </a>
+        </li>
+        <li>
+          <a
+            href="https://github.com/KuyaPollio/jellyfin-plugin-dismiss-continue-watching/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Report Issues
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

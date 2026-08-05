@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Jellyfin.Plugin.DismissContinueWatching</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+    <CodeAnalysisRuleSet>../jellyfin.ruleset</CodeAnalysisRuleSet>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <PublishDeps>true</PublishDeps>
+
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <PluginVersion>1.0.0</PluginVersion>
+
+    <PackageId>Jellyfin.Plugin.DismissContinueWatching</PackageId>
+    <Title>DismissContinueWatching</Title>
+    <Authors>KuyaPollio</Authors>
+    <Description>Dismiss Continue Watching items by marking them as watched</Description>
+    <PackageLicenseExpression>GPL-3.0</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/KuyaPollio/jellyfin-plugin-dismiss-continue-watching</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.0" />
+    <PackageReference Include="Jellyfin.Model" Version="10.11.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Web\dismiss-continue-watching.js" />
+    <EmbeddedResource Include="Web\dismiss-continue-watching.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Pages\**\*" />
+    <EmbeddedResource Include="Pages\**\*" />
+  </ItemGroup>
+
+  <Target Name="CreatePluginPackage" AfterTargets="Publish" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <PluginDir>$(MSBuildProjectDirectory)/../bin/plugin</PluginDir>
+      <PluginArchive>$(MSBuildProjectDirectory)/../bin/jellyfin-plugin-dismiss-continue-watching-$(PluginVersion).zip</PluginArchive>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PluginFiles Include="$(PublishDir)$(AssemblyName).dll" />
+    </ItemGroup>
+
+    <RemoveDir Directories="$(PluginDir)" />
+    <MakeDir Directories="$(PluginDir)" />
+    <Copy SourceFiles="@(PluginFiles)" DestinationFolder="$(PluginDir)" />
+
+    <Message Text="Plugin package contents:" Importance="high" />
+    <Message Text="  - %(PluginFiles.Filename)%(PluginFiles.Extension)" Importance="high" />
+
+    <Exec Command="which zip > /dev/null 2>&amp;1 &amp;&amp; cd &quot;$(PluginDir)&quot; &amp;&amp; zip -r &quot;$(PluginArchive)&quot; . || echo 'zip command not available, package created in $(PluginDir)'"
+          ContinueOnError="true" />
+
+    <Message Text="Plugin files prepared in: $(PluginDir)" Importance="high" />
+    <Message Text="Plugin package: $(PluginArchive)" Importance="high" Condition="Exists('$(PluginArchive)')" />
+  </Target>
+
+</Project>

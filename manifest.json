@@ -1,0 +1,11 @@
+[
+  {
+    "guid": "d07fb0c0-4da7-45c3-b14b-c4b4dc644a88",
+    "name": "DismissContinueWatching",
+    "overview": "Dismiss Continue Watching items by marking them as watched",
+    "description": "Adds a dismiss button on Continue Watching cards. Clicking it marks the item as played so it leaves Continue Watching.",
+    "owner": "KuyaPollio",
+    "category": "General",
+    "versions": []
+  }
+]
