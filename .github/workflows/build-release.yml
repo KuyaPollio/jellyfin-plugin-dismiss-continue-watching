@@ -127,6 +127,8 @@ jobs:
           draft: false
           prerelease: ${{ contains(needs.build.outputs.version, '-') }}
           generate_release_notes: false
+          # Keep release asset identical to the zip whose checksum we write below
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
