@@ -85,10 +85,15 @@ public class DismissContinueWatchingPlugin : BasePlugin<PluginConfiguration>, IH
                 return false;
             }
 
+            // Drop previous Injector entries so upgrades always refresh script body
+            pluginInterfaceType
+                .GetMethod("UnregisterAllScriptsFromPlugin")
+                ?.Invoke(null, [Id.ToString()]);
+
             var scriptRegistration = new JObject
             {
-                { "id", $"{Id}-script" },
-                { "name", "DismissContinueWatching Client Script" },
+                { "id", $"{Id}-script-v{Version}" },
+                { "name", $"DismissContinueWatching Client Script v{Version}" },
                 { "script", scriptContent },
                 { "enabled", true },
                 { "requiresAuthentication", true },

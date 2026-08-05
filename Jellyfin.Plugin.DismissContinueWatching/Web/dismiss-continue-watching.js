@@ -6,9 +6,16 @@
 (function () {
   'use strict';
 
+  const VERSION = '1.0.3';
   const LOG = '[DismissContinueWatching]';
   const BTN_CLASS = 'dismiss-continue-watching-button';
-  console.log(`${LOG} Initializing...`);
+
+  // Available immediately so console can confirm which script body loaded
+  window.DismissContinueWatching = {
+    version: VERSION,
+    ready: false,
+  };
+  console.log(`${LOG} Initializing v${VERSION}...`);
 
   const style = document.createElement('style');
   style.textContent = `
@@ -298,6 +305,8 @@
 
       // Expose manual debug helper in the browser console
       window.DismissContinueWatching = {
+        version: VERSION,
+        ready: true,
         rescan: () => processResumeCards(document, 'debug'),
         debug() {
           const allCards = document.querySelectorAll('.card');
@@ -311,6 +320,7 @@
             hasBar: !!c.querySelector('.itemProgressBar, .cardProgressBar'),
           }));
           const result = {
+            version: VERSION,
             allCards: allCards.length,
             withTicks: withTicks.length,
             withBar: withBar.length,
@@ -323,7 +333,7 @@
         },
       };
 
-      console.log(`${LOG} Ready — run DismissContinueWatching.debug() if the button is missing`);
+      console.log(`${LOG} Ready v${VERSION} — run window.DismissContinueWatching.debug() if the button is missing`);
     } catch (error) {
       console.error(`${LOG} Initialization aborted:`, error);
     }
