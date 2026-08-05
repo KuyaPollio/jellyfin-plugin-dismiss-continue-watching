@@ -8,11 +8,19 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.0.3.0",
+        "changelog": "- Fix catalog install checksum mismatch\n- Force-refresh JS Injector script on upgrade\n- Versioned console debug helper\n",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/KuyaPollio/jellyfin-plugin-dismiss-continue-watching/releases/download/v1.0.3/jellyfin-plugin-dismiss-continue-watching-1.0.3.zip",
+        "checksum": "daa834761a3cf1690fcd13aa9548853d",
+        "timestamp": "2026-08-05T15:18:38Z"
+      },
+      {
         "version": "1.0.2.0",
         "changelog": "- Always-visible dismiss button (fix hover CSS opacity)\n- Detect resume cards via progress bar\n",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/KuyaPollio/jellyfin-plugin-dismiss-continue-watching/releases/download/v1.0.2/jellyfin-plugin-dismiss-continue-watching-1.0.2.zip",
-        "checksum": "a28ddff7b04c642bb52361e491a440ad",
+        "checksum": "2aae3fe416caf06141ee8647f3ad553f",
         "timestamp": "2026-08-05T15:07:52Z"
       },
       {
@@ -20,7 +28,7 @@
         "changelog": "- Fix dismiss button visibility on desktop hover and touch\n- Retry JavaScript Injector registration\n",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/KuyaPollio/jellyfin-plugin-dismiss-continue-watching/releases/download/v1.0.1/jellyfin-plugin-dismiss-continue-watching-1.0.1.zip",
-        "checksum": "5f2d081c9b9c2c47f9b75ecb2cd98753",
+        "checksum": "12f216876eeb26d22747a4b8b31662d8",
         "timestamp": "2026-08-05T14:59:06Z"
       },
       {
