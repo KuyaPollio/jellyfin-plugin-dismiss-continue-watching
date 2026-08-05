@@ -1,5 +1,5 @@
 /**
- * Adds a dismiss button on Continue Watching cards.
+ * Adds a dismiss button on Continue Watching / resume cards.
  * Clicking it marks the item as played via the native Jellyfin API.
  */
 
@@ -7,58 +7,56 @@
   'use strict';
 
   const LOG = '[DismissContinueWatching]';
+  const BTN_CLASS = 'dismiss-continue-watching-button';
   console.log(`${LOG} Initializing...`);
 
   const style = document.createElement('style');
   style.textContent = `
-    .dismiss-continue-watching-button {
-      z-index: 12 !important;
-    }
-
-    /* Standalone fallback when no native overlay button row exists */
-    .dismiss-continue-watching-button.dismiss-continue-watching-fallback {
+    .${BTN_CLASS} {
       position: absolute !important;
       top: 6px !important;
       right: 6px !important;
-      background: rgba(0, 0, 0, 0.75) !important;
+      z-index: 30 !important;
+      width: 34px !important;
+      height: 34px !important;
+      padding: 0 !important;
+      margin: 0 !important;
       border: none !important;
       border-radius: 50% !important;
-      width: 36px !important;
-      height: 36px !important;
+      background: rgba(0, 0, 0, 0.72) !important;
+      color: #fff !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
       cursor: pointer !important;
-      opacity: 0 !important;
-      pointer-events: none !important;
-      transition: opacity 0.15s ease, transform 0.15s ease !important;
-      transform: scale(0.9) !important;
-    }
-
-    .card:hover .dismiss-continue-watching-button.dismiss-continue-watching-fallback,
-    .card:focus-within .dismiss-continue-watching-button.dismiss-continue-watching-fallback,
-    .dismiss-continue-watching-button.dismiss-continue-watching-fallback:focus {
       opacity: 1 !important;
       pointer-events: auto !important;
-      transform: scale(1) !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45) !important;
     }
 
-    /* Touch / coarse pointers: always show on resume cards */
-    @media (hover: none), (pointer: coarse) {
-      .dismiss-continue-watching-button.dismiss-continue-watching-fallback {
-        opacity: 1 !important;
-        pointer-events: auto !important;
-        transform: scale(1) !important;
-      }
+    .${BTN_CLASS}:hover,
+    .${BTN_CLASS}:focus {
+      background: rgba(198, 40, 40, 0.95) !important;
+      transform: scale(1.06);
     }
 
-    .dismiss-continue-watching-button.dismiss-continue-watching-fallback:hover {
-      background: rgba(220, 38, 38, 0.95) !important;
+    .${BTN_CLASS}:disabled {
+      opacity: 0.55 !important;
+      cursor: wait !important;
     }
 
-    .dismiss-continue-watching-button .material-icons,
-    .dismiss-continue-watching-button .cardOverlayButtonIcon {
-      pointer-events: none;
+    .${BTN_CLASS} .material-icons {
+      color: #fff !important;
+      font-size: 18px !important;
+      line-height: 1 !important;
+      pointer-events: none !important;
+    }
+
+    /* Ensure positioning context on common card hosts */
+    .card.dismiss-cw-host .cardScalable,
+    .card.dismiss-cw-host .cardBox,
+    .card.dismiss-cw-host {
+      position: relative;
     }
   `;
   document.head.appendChild(style);
@@ -90,148 +88,169 @@
     });
   }
 
-  function getResumeCard(fromEl) {
-    const card = fromEl.closest ? fromEl.closest('.card') : null;
-    if (!card) {
-      return null;
-    }
-
-    // Continue Watching / resume items expose data-positionticks (truthy ticks only)
-    const ticks = card.getAttribute('data-positionticks');
-    if (!ticks || ticks === '0') {
-      return null;
-    }
-
-    return card;
+  function getItemId(card) {
+    return (
+      card.getAttribute('data-id') ||
+      card.querySelector('[data-id]')?.getAttribute('data-id') ||
+      null
+    );
   }
 
-  function createDismissButton(itemId, { fallback }) {
-    const dismissButton = document.createElement('button');
-    dismissButton.type = 'button';
-    dismissButton.setAttribute('data-action', 'none');
-    dismissButton.setAttribute('data-id', itemId);
-    dismissButton.title = 'Mark as watched (remove from Continue Watching)';
-    dismissButton.setAttribute('aria-label', 'Mark as watched');
-
-    if (fallback) {
-      dismissButton.className = 'dismiss-continue-watching-button dismiss-continue-watching-fallback';
-    } else {
-      // Match native hover-menu buttons so it appears with check / favorite / more
-      dismissButton.className =
-        'cardOverlayButton cardOverlayButton-hover itemAction paper-icon-button-light dismiss-continue-watching-button';
-      dismissButton.setAttribute('is', 'paper-icon-button-light');
+  function hasResumeProgress(card) {
+    if (!card || !card.getAttribute) {
+      return false;
     }
+
+    const ticks =
+      card.getAttribute('data-positionticks') ||
+      card.querySelector('[data-positionticks]')?.getAttribute('data-positionticks');
+
+    if (ticks && ticks !== '0') {
+      return true;
+    }
+
+    // Resume cards almost always render a progress bar
+    if (card.querySelector('.itemProgressBar, .cardProgressBar, emby-progressbar, [is="emby-progressbar"]')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function getButtonHost(card) {
+    return (
+      card.querySelector('.cardScalable') ||
+      card.querySelector('.cardImageContainer') ||
+      card.querySelector('.cardBox') ||
+      card
+    );
+  }
+
+  function createDismissButton(itemId) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = BTN_CLASS;
+    btn.setAttribute('data-action', 'none');
+    btn.setAttribute('data-dismiss-cw', 'true');
+    btn.setAttribute('data-id', itemId);
+    btn.title = 'Mark as watched (remove from Continue Watching)';
+    btn.setAttribute('aria-label', 'Mark as watched');
 
     const icon = document.createElement('span');
-    icon.className = fallback
-      ? 'material-icons'
-      : 'material-icons cardOverlayButtonIcon cardOverlayButtonIcon-hover';
+    icon.className = 'material-icons';
     icon.textContent = 'close';
     icon.setAttribute('aria-hidden', 'true');
-    dismissButton.appendChild(icon);
+    btn.appendChild(icon);
 
-    dismissButton.addEventListener('click', async e => {
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
+    btn.addEventListener(
+      'click',
+      async e => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
 
-      const card = dismissButton.closest('.card');
-      const originalIcon = icon.textContent;
-      icon.textContent = 'hourglass_empty';
-      dismissButton.disabled = true;
+        const card = btn.closest('.card');
+        const originalIcon = icon.textContent;
+        icon.textContent = 'hourglass_empty';
+        btn.disabled = true;
 
-      try {
-        await markItemPlayed(itemId);
-        if (card) {
-          card.remove();
+        try {
+          await markItemPlayed(itemId);
+          card?.remove();
+          console.log(`${LOG} Marked item ${itemId} as played`);
+        } catch (error) {
+          console.error(`${LOG} Failed to mark as played:`, error);
+          icon.textContent = originalIcon;
+          btn.disabled = false;
+          alert('Failed to remove from Continue Watching. Please try again.');
         }
-        console.log(`${LOG} Marked item ${itemId} as played`);
-      } catch (error) {
-        console.error(`${LOG} Failed to mark as played:`, error);
-        icon.textContent = originalIcon;
-        dismissButton.disabled = false;
-        alert('Failed to remove from Continue Watching. Please try again.');
-      }
-    });
+      },
+      true
+    );
 
-    return dismissButton;
+    return btn;
   }
 
-  /**
-   * Inject dismiss control into a resume card.
-   * @param {Element} card
-   */
   function addDismissButtonToCard(card) {
-    if (!card || card.querySelector('.dismiss-continue-watching-button')) {
-      return;
+    if (!card || card.querySelector(`.${BTN_CLASS}`)) {
+      return false;
     }
 
-    const ticks = card.getAttribute('data-positionticks');
-    if (!ticks || ticks === '0') {
-      return;
+    if (!hasResumeProgress(card)) {
+      return false;
     }
 
-    const itemId = card.getAttribute('data-id');
+    const itemId = getItemId(card);
     if (!itemId) {
-      return;
+      return false;
     }
 
-    // Desktop hover menu + mobile overlay share .cardOverlayButton-br
-    const buttonRow = card.querySelector('.cardOverlayButton-br');
-    if (buttonRow) {
-      const btn = createDismissButton(itemId, { fallback: false });
-      buttonRow.insertBefore(btn, buttonRow.firstChild);
-      console.log(`${LOG} Added native-style button for ${itemId}`);
-      return;
-    }
-
-    // Fallback: absolute button on the scalable image area
-    const host =
-      card.querySelector('.cardScalable') ||
-      card.querySelector('.cardBox') ||
-      card;
+    card.classList.add('dismiss-cw-host');
+    const host = getButtonHost(card);
     if (getComputedStyle(host).position === 'static') {
       host.style.position = 'relative';
     }
 
-    host.appendChild(createDismissButton(itemId, { fallback: true }));
-    console.log(`${LOG} Added fallback button for ${itemId}`);
+    host.appendChild(createDismissButton(itemId));
+    return true;
   }
 
-  function processResumeCards(root) {
-    const scope = root && root.querySelectorAll ? root : document;
-    const cards = [];
+  function collectResumeCards(root) {
+    const scope = root && root.nodeType === Node.ELEMENT_NODE ? root : document;
+    const found = new Set();
 
-    if (scope.classList && scope.classList.contains('card')) {
-      cards.push(scope);
+    const maybeAdd = el => {
+      const card = el.classList?.contains('card') ? el : el.closest?.('.card');
+      if (card && hasResumeProgress(card)) {
+        found.add(card);
+      }
+    };
+
+    if (scope.classList?.contains('card')) {
+      maybeAdd(scope);
     }
 
-    scope.querySelectorAll?.('.card[data-positionticks]').forEach(card => cards.push(card));
+    scope.querySelectorAll?.('.card[data-positionticks]').forEach(maybeAdd);
+    scope.querySelectorAll?.('.card .itemProgressBar, .card .cardProgressBar').forEach(el => maybeAdd(el));
+    scope.querySelectorAll?.('.card [data-positionticks]').forEach(el => maybeAdd(el));
 
-    cards.forEach(addDismissButtonToCard);
+    return [...found];
+  }
 
-    // Overlays may appear as separate nodes; map them back to resume cards
-    scope.querySelectorAll?.('.cardOverlayContainer').forEach(overlay => {
-      const card = getResumeCard(overlay);
-      if (card) {
-        addDismissButtonToCard(card);
+  function processResumeCards(root, reason) {
+    const cards = collectResumeCards(root);
+    let added = 0;
+    cards.forEach(card => {
+      if (addDismissButtonToCard(card)) {
+        added++;
       }
     });
+
+    if (added > 0 || reason === 'debug') {
+      console.log(`${LOG} scan(${reason || 'mutation'}): ${cards.length} resume card(s), added ${added}`);
+    }
+
+    return { cards: cards.length, added };
   }
 
   function setupObserver() {
     const observer = new MutationObserver(mutations => {
+      let shouldScan = false;
       for (const mutation of mutations) {
-        if (mutation.type !== 'childList') {
+        if (mutation.type !== 'childList' || mutation.addedNodes.length === 0) {
           continue;
         }
-
+        shouldScan = true;
         mutation.addedNodes.forEach(node => {
-          if (node.nodeType !== Node.ELEMENT_NODE) {
-            return;
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            processResumeCards(node, 'added');
           }
-          processResumeCards(node);
         });
+      }
+
+      // Some Jellyfin themes rewrite large home sections in one pass
+      if (shouldScan) {
+        processResumeCards(document, 'document');
       }
     });
 
@@ -240,7 +259,7 @@
       subtree: true,
     });
 
-    processResumeCards(document);
+    processResumeCards(document, 'init');
   }
 
   function waitForApiClient() {
@@ -271,10 +290,40 @@
     try {
       await waitForApiClient();
       setupObserver();
-      // Home sections often hydrate after first paint
-      setTimeout(() => processResumeCards(document), 1500);
-      setTimeout(() => processResumeCards(document), 4000);
-      console.log(`${LOG} Ready`);
+
+      // Home sections hydrate asynchronously
+      [500, 1500, 3000, 6000, 10000].forEach(ms => {
+        setTimeout(() => processResumeCards(document, `t+${ms}`), ms);
+      });
+
+      // Expose manual debug helper in the browser console
+      window.DismissContinueWatching = {
+        rescan: () => processResumeCards(document, 'debug'),
+        debug() {
+          const allCards = document.querySelectorAll('.card');
+          const withTicks = document.querySelectorAll('.card[data-positionticks], .card [data-positionticks]');
+          const withBar = document.querySelectorAll('.card .itemProgressBar, .card .cardProgressBar');
+          const buttons = document.querySelectorAll(`.${BTN_CLASS}`);
+          const sample = [...document.querySelectorAll('.card')].slice(0, 5).map(c => ({
+            id: c.getAttribute('data-id'),
+            ticks: c.getAttribute('data-positionticks'),
+            classes: c.className,
+            hasBar: !!c.querySelector('.itemProgressBar, .cardProgressBar'),
+          }));
+          const result = {
+            allCards: allCards.length,
+            withTicks: withTicks.length,
+            withBar: withBar.length,
+            buttons: buttons.length,
+            sample,
+          };
+          console.log(`${LOG} debug`, result);
+          processResumeCards(document, 'debug');
+          return result;
+        },
+      };
+
+      console.log(`${LOG} Ready — run DismissContinueWatching.debug() if the button is missing`);
     } catch (error) {
       console.error(`${LOG} Initialization aborted:`, error);
     }
