@@ -47,8 +47,8 @@
     <div class="verticalSection">
       <h3 class="sectionTitle">How it works</h3>
       <p class="fieldDescription">
-        On hover, a close button appears on Continue Watching cards. The click calls Jellyfin's native
-        <code>PlayedItems</code> API for the current user, then removes the card from the page.
+        A close button is added on Continue Watching cards. Clicking it stores the item in a per-user denylist
+        (so it stays gone after refresh) and also marks it played. Starting playback again removes it from the denylist.
       </p>
       <p class="fieldDescription">
         Supported on Jellyfin Web and official apps that use the web UI. Pure third-party clients are not supported.

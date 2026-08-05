@@ -1,12 +1,11 @@
 /**
- * Adds a dismiss button on Continue Watching / resume-row cards.
- * Clicking marks the item watched and clears resume position so it leaves the row.
+ * Dismiss Continue Watching cards and keep them hidden via a server denylist.
  */
 
 (function () {
   'use strict';
 
-  const VERSION = '1.0.4';
+  const VERSION = '1.0.5';
   const LOG = '[DismissContinueWatching]';
   const BTN_CLASS = 'dismiss-continue-watching-button';
 
@@ -66,6 +65,14 @@
   `;
   document.head.appendChild(style);
 
+  let denylist = new Set();
+
+  function normalizeId(id) {
+    return String(id || '')
+      .replace(/-/g, '')
+      .toLowerCase();
+  }
+
   function getApiClient() {
     if (!window.ApiClient || !window.ApiClient.accessToken || !window.ApiClient.accessToken()) {
       return null;
@@ -73,48 +80,71 @@
     return window.ApiClient;
   }
 
-  /**
-   * Force-remove from Continue Watching:
-   * clear resume ticks + mark played (covers in-progress and already-played oddities).
-   */
-  async function dismissItem(itemId) {
+  function authHeaders(extra) {
+    const api = getApiClient();
+    return {
+      Authorization: `MediaBrowser Token="${api.accessToken()}"`,
+      ...(extra || {}),
+    };
+  }
+
+  async function loadDenylist() {
+    const api = getApiClient();
+    if (!api) {
+      denylist = new Set();
+      return;
+    }
+
+    const url = api.getUrl('DismissContinueWatching/Items');
+    const res = await fetch(url, { headers: authHeaders() });
+    if (!res.ok) {
+      throw new Error(`Failed to load denylist: HTTP ${res.status}`);
+    }
+
+    const items = await res.json();
+    denylist = new Set((items || []).map(normalizeId));
+    console.log(`${LOG} Loaded denylist (${denylist.size})`);
+  }
+
+  async function addToDenylist(itemId) {
     const api = getApiClient();
     if (!api) {
       throw new Error('ApiClient not available');
     }
 
-    const userId = api.getCurrentUserId();
-    if (!userId) {
-      throw new Error('No current user');
+    const url = api.getUrl(`DismissContinueWatching/Items/${itemId}`);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to dismiss: HTTP ${res.status}`);
     }
 
-    const auth = { Authorization: `MediaBrowser Token="${api.accessToken()}"` };
+    denylist.add(normalizeId(itemId));
+  }
 
-    // Clear resume point (works even when the card has no data-positionticks)
-    const userDataUrl = api.getUrl(`Users/${userId}/Items/${itemId}/UserData`);
-    const userDataRes = await fetch(userDataUrl, {
-      method: 'POST',
-      headers: {
-        ...auth,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        PlaybackPositionTicks: 0,
-        Played: true,
-      }),
-    });
-    if (!userDataRes.ok) {
-      // Fallback for older servers
+  async function markPlayed(itemId) {
+    const api = getApiClient();
+    if (!api) {
+      return;
+    }
+
+    const userId = api.getCurrentUserId();
+    if (!userId) {
+      return;
+    }
+
+    try {
       if (typeof api.markPlayed === 'function') {
-        await api.markPlayed(userId, itemId);
-        return;
+        await api.markPlayed(userId, itemId, new Date());
+      } else {
+        const url = api.getUrl(`Users/${userId}/PlayedItems/${itemId}`);
+        await fetch(url, { method: 'POST', headers: authHeaders() });
       }
-
-      const playedUrl = api.getUrl(`Users/${userId}/PlayedItems/${itemId}`);
-      const playedRes = await fetch(playedUrl, { method: 'POST', headers: auth });
-      if (!playedRes.ok) {
-        throw new Error(`HTTP ${userDataRes.status}/${playedRes.status}`);
-      }
+    } catch (error) {
+      // Denylist is the source of truth for hiding; markPlayed is best-effort.
+      console.warn(`${LOG} markPlayed failed (ignored):`, error);
     }
   }
 
@@ -126,7 +156,6 @@
     );
   }
 
-  /** Strong signal: this card itself is an in-progress / resume item */
   function isResumeSignalCard(card) {
     if (!card?.getAttribute) {
       return false;
@@ -143,7 +172,6 @@
       return true;
     }
 
-    // Jellyfin resume/CW cards expose a primary overlay action="resume"
     if (card.querySelector('[data-action="resume"]')) {
       return true;
     }
@@ -151,27 +179,14 @@
     return false;
   }
 
-  /**
-   * Cards that should get the dismiss button:
-   * - any resume-signal card
-   * - every sibling card in the same items container as a resume-signal card
-   *   (so the whole Continue Watching row is covered, including already-played oddities)
-   */
   function isDismissTargetCard(card) {
     if (!card?.classList?.contains('card')) {
       return false;
     }
 
-    // Skip library folders / non-playable tiles
     const type = (card.getAttribute('data-type') || '').toLowerCase();
-    if (type === 'collectionfolder' || type === 'userView'.toLowerCase() || type === 'userview') {
+    if (type === 'collectionfolder' || type === 'userview') {
       return false;
-    }
-    if (card.getAttribute('data-isfolder') === 'true' && type !== 'episode' && type !== 'movie') {
-      // Series/folder tiles in other rows
-      if (!isResumeSignalCard(card)) {
-        return false;
-      }
     }
 
     if (isResumeSignalCard(card)) {
@@ -185,15 +200,32 @@
       return false;
     }
 
-    // Only promote siblings when this row clearly contains resume/CW cards
-    const siblingCards = container.querySelectorAll(':scope > .card, :scope .card');
-    for (const sibling of siblingCards) {
+    for (const sibling of container.querySelectorAll('.card')) {
       if (sibling !== card && isResumeSignalCard(sibling)) {
         return true;
       }
     }
 
     return false;
+  }
+
+  function filterDenylistedCards(root) {
+    const scope = root && root.nodeType === Node.ELEMENT_NODE ? root : document;
+    const cards = [];
+    if (scope.classList?.contains('card')) {
+      cards.push(scope);
+    }
+    scope.querySelectorAll?.('.card[data-id]').forEach(card => cards.push(card));
+
+    let removed = 0;
+    cards.forEach(card => {
+      const id = normalizeId(getItemId(card));
+      if (id && denylist.has(id)) {
+        card.remove();
+        removed++;
+      }
+    });
+    return removed;
   }
 
   function getButtonHost(card) {
@@ -234,7 +266,8 @@
         btn.disabled = true;
 
         try {
-          await dismissItem(itemId);
+          await addToDenylist(itemId);
+          await markPlayed(itemId);
           card?.remove();
           console.log(`${LOG} Dismissed item ${itemId}`);
         } catch (error) {
@@ -261,6 +294,11 @@
 
     const itemId = getItemId(card);
     if (!itemId) {
+      return false;
+    }
+
+    if (denylist.has(normalizeId(itemId))) {
+      card.remove();
       return false;
     }
 
@@ -293,7 +331,6 @@
     scope.querySelectorAll?.('.card .itemProgressBar, .card .cardProgressBar').forEach(el => consider(el));
     scope.querySelectorAll?.('.card [data-action="resume"]').forEach(el => consider(el));
 
-    // Expand to full resume rows
     [...found].forEach(card => {
       const container =
         card.closest('.itemsContainer, emby-itemscontainer, [is="emby-itemscontainer"], .scrollSlider') ||
@@ -309,6 +346,8 @@
   }
 
   function processResumeCards(root, reason) {
+    filterDenylistedCards(root);
+
     const cards = collectTargetCards(root);
     let added = 0;
     cards.forEach(card => {
@@ -318,10 +357,12 @@
     });
 
     if (added > 0 || reason === 'debug') {
-      console.log(`${LOG} scan(${reason || 'mutation'}): ${cards.length} target card(s), added ${added}`);
+      console.log(
+        `${LOG} scan(${reason || 'mutation'}): ${cards.length} target(s), added ${added}, denylist ${denylist.size}`
+      );
     }
 
-    return { cards: cards.length, added };
+    return { cards: cards.length, added, denylist: denylist.size };
   }
 
   function setupObserver() {
@@ -379,6 +420,7 @@
   async function init() {
     try {
       await waitForApiClient();
+      await loadDenylist();
       setupObserver();
 
       [500, 1500, 3000, 6000, 10000].forEach(ms => {
@@ -388,26 +430,18 @@
       window.DismissContinueWatching = {
         version: VERSION,
         ready: true,
+        denylist: () => [...denylist],
         rescan: () => processResumeCards(document, 'debug'),
+        async reloadDenylist() {
+          await loadDenylist();
+          return processResumeCards(document, 'debug');
+        },
         debug() {
-          const allCards = [...document.querySelectorAll('.card')];
           const result = {
             version: VERSION,
-            allCards: allCards.length,
-            withTicks: document.querySelectorAll('.card[data-positionticks]').length,
-            withResumeAction: document.querySelectorAll('.card [data-action="resume"]').length,
-            withBar: document.querySelectorAll('.card .itemProgressBar').length,
+            denylist: [...denylist],
             buttons: document.querySelectorAll(`.${BTN_CLASS}`).length,
             targets: collectTargetCards(document).length,
-            sample: allCards.slice(0, 8).map(c => ({
-              id: c.getAttribute('data-id'),
-              type: c.getAttribute('data-type'),
-              ticks: c.getAttribute('data-positionticks'),
-              resume: !!c.querySelector('[data-action="resume"]'),
-              hasBar: !!c.querySelector('.itemProgressBar'),
-              target: isDismissTargetCard(c),
-              hasBtn: !!c.querySelector(`.${BTN_CLASS}`),
-            })),
           };
           console.log(`${LOG} debug`, result);
           processResumeCards(document, 'debug');
@@ -415,7 +449,7 @@
         },
       };
 
-      console.log(`${LOG} Ready v${VERSION} — run window.DismissContinueWatching.debug() if needed`);
+      console.log(`${LOG} Ready v${VERSION}`);
     } catch (error) {
       console.error(`${LOG} Initialization aborted:`, error);
     }
