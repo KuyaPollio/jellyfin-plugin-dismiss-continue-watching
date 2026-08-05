@@ -1,16 +1,15 @@
 /**
- * Adds a dismiss button on Continue Watching / resume cards.
- * Clicking it marks the item as played via the native Jellyfin API.
+ * Adds a dismiss button on Continue Watching / resume-row cards.
+ * Clicking marks the item watched and clears resume position so it leaves the row.
  */
 
 (function () {
   'use strict';
 
-  const VERSION = '1.0.3';
+  const VERSION = '1.0.4';
   const LOG = '[DismissContinueWatching]';
   const BTN_CLASS = 'dismiss-continue-watching-button';
 
-  // Available immediately so console can confirm which script body loaded
   window.DismissContinueWatching = {
     version: VERSION,
     ready: false,
@@ -59,7 +58,6 @@
       pointer-events: none !important;
     }
 
-    /* Ensure positioning context on common card hosts */
     .card.dismiss-cw-host .cardScalable,
     .card.dismiss-cw-host .cardBox,
     .card.dismiss-cw-host {
@@ -68,57 +66,131 @@
   `;
   document.head.appendChild(style);
 
-  function markItemPlayed(itemId) {
+  function getApiClient() {
     if (!window.ApiClient || !window.ApiClient.accessToken || !window.ApiClient.accessToken()) {
-      return Promise.reject(new Error('ApiClient not available'));
+      return null;
+    }
+    return window.ApiClient;
+  }
+
+  /**
+   * Force-remove from Continue Watching:
+   * clear resume ticks + mark played (covers in-progress and already-played oddities).
+   */
+  async function dismissItem(itemId) {
+    const api = getApiClient();
+    if (!api) {
+      throw new Error('ApiClient not available');
     }
 
-    const userId = window.ApiClient.getCurrentUserId();
+    const userId = api.getCurrentUserId();
     if (!userId) {
-      return Promise.reject(new Error('No current user'));
+      throw new Error('No current user');
     }
 
-    if (typeof window.ApiClient.markPlayed === 'function') {
-      return window.ApiClient.markPlayed(userId, itemId);
-    }
+    const auth = { Authorization: `MediaBrowser Token="${api.accessToken()}"` };
 
-    const url = window.ApiClient.getUrl(`Users/${userId}/PlayedItems/${itemId}`);
-    return fetch(url, {
+    // Clear resume point (works even when the card has no data-positionticks)
+    const userDataUrl = api.getUrl(`Users/${userId}/Items/${itemId}/UserData`);
+    const userDataRes = await fetch(userDataUrl, {
       method: 'POST',
       headers: {
-        Authorization: `MediaBrowser Token="${window.ApiClient.accessToken()}"`,
+        ...auth,
+        'Content-Type': 'application/json',
       },
-    }).then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      body: JSON.stringify({
+        PlaybackPositionTicks: 0,
+        Played: true,
+      }),
     });
+    if (!userDataRes.ok) {
+      // Fallback for older servers
+      if (typeof api.markPlayed === 'function') {
+        await api.markPlayed(userId, itemId);
+        return;
+      }
+
+      const playedUrl = api.getUrl(`Users/${userId}/PlayedItems/${itemId}`);
+      const playedRes = await fetch(playedUrl, { method: 'POST', headers: auth });
+      if (!playedRes.ok) {
+        throw new Error(`HTTP ${userDataRes.status}/${playedRes.status}`);
+      }
+    }
   }
 
   function getItemId(card) {
     return (
       card.getAttribute('data-id') ||
-      card.querySelector('[data-id]')?.getAttribute('data-id') ||
+      card.querySelector(':scope > .cardBox [data-id], :scope > [data-id]')?.getAttribute('data-id') ||
       null
     );
   }
 
-  function hasResumeProgress(card) {
-    if (!card || !card.getAttribute) {
+  /** Strong signal: this card itself is an in-progress / resume item */
+  function isResumeSignalCard(card) {
+    if (!card?.getAttribute) {
       return false;
     }
 
     const ticks =
       card.getAttribute('data-positionticks') ||
       card.querySelector('[data-positionticks]')?.getAttribute('data-positionticks');
-
     if (ticks && ticks !== '0') {
       return true;
     }
 
-    // Resume cards almost always render a progress bar
-    if (card.querySelector('.itemProgressBar, .cardProgressBar, emby-progressbar, [is="emby-progressbar"]')) {
+    if (card.querySelector('.itemProgressBar, .cardProgressBar, [is="emby-progressbar"]')) {
       return true;
+    }
+
+    // Jellyfin resume/CW cards expose a primary overlay action="resume"
+    if (card.querySelector('[data-action="resume"]')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Cards that should get the dismiss button:
+   * - any resume-signal card
+   * - every sibling card in the same items container as a resume-signal card
+   *   (so the whole Continue Watching row is covered, including already-played oddities)
+   */
+  function isDismissTargetCard(card) {
+    if (!card?.classList?.contains('card')) {
+      return false;
+    }
+
+    // Skip library folders / non-playable tiles
+    const type = (card.getAttribute('data-type') || '').toLowerCase();
+    if (type === 'collectionfolder' || type === 'userView'.toLowerCase() || type === 'userview') {
+      return false;
+    }
+    if (card.getAttribute('data-isfolder') === 'true' && type !== 'episode' && type !== 'movie') {
+      // Series/folder tiles in other rows
+      if (!isResumeSignalCard(card)) {
+        return false;
+      }
+    }
+
+    if (isResumeSignalCard(card)) {
+      return true;
+    }
+
+    const container =
+      card.closest('.itemsContainer, emby-itemscontainer, [is="emby-itemscontainer"], .scrollSlider') ||
+      card.parentElement;
+    if (!container) {
+      return false;
+    }
+
+    // Only promote siblings when this row clearly contains resume/CW cards
+    const siblingCards = container.querySelectorAll(':scope > .card, :scope .card');
+    for (const sibling of siblingCards) {
+      if (sibling !== card && isResumeSignalCard(sibling)) {
+        return true;
+      }
     }
 
     return false;
@@ -140,8 +212,8 @@
     btn.setAttribute('data-action', 'none');
     btn.setAttribute('data-dismiss-cw', 'true');
     btn.setAttribute('data-id', itemId);
-    btn.title = 'Mark as watched (remove from Continue Watching)';
-    btn.setAttribute('aria-label', 'Mark as watched');
+    btn.title = 'Remove from Continue Watching';
+    btn.setAttribute('aria-label', 'Remove from Continue Watching');
 
     const icon = document.createElement('span');
     icon.className = 'material-icons';
@@ -162,11 +234,11 @@
         btn.disabled = true;
 
         try {
-          await markItemPlayed(itemId);
+          await dismissItem(itemId);
           card?.remove();
-          console.log(`${LOG} Marked item ${itemId} as played`);
+          console.log(`${LOG} Dismissed item ${itemId}`);
         } catch (error) {
-          console.error(`${LOG} Failed to mark as played:`, error);
+          console.error(`${LOG} Failed to dismiss:`, error);
           icon.textContent = originalIcon;
           btn.disabled = false;
           alert('Failed to remove from Continue Watching. Please try again.');
@@ -183,7 +255,7 @@
       return false;
     }
 
-    if (!hasResumeProgress(card)) {
+    if (!isDismissTargetCard(card)) {
       return false;
     }
 
@@ -202,30 +274,42 @@
     return true;
   }
 
-  function collectResumeCards(root) {
+  function collectTargetCards(root) {
     const scope = root && root.nodeType === Node.ELEMENT_NODE ? root : document;
     const found = new Set();
 
-    const maybeAdd = el => {
+    const consider = el => {
       const card = el.classList?.contains('card') ? el : el.closest?.('.card');
-      if (card && hasResumeProgress(card)) {
+      if (card && isDismissTargetCard(card)) {
         found.add(card);
       }
     };
 
     if (scope.classList?.contains('card')) {
-      maybeAdd(scope);
+      consider(scope);
     }
 
-    scope.querySelectorAll?.('.card[data-positionticks]').forEach(maybeAdd);
-    scope.querySelectorAll?.('.card .itemProgressBar, .card .cardProgressBar').forEach(el => maybeAdd(el));
-    scope.querySelectorAll?.('.card [data-positionticks]').forEach(el => maybeAdd(el));
+    scope.querySelectorAll?.('.card[data-positionticks]').forEach(consider);
+    scope.querySelectorAll?.('.card .itemProgressBar, .card .cardProgressBar').forEach(el => consider(el));
+    scope.querySelectorAll?.('.card [data-action="resume"]').forEach(el => consider(el));
+
+    // Expand to full resume rows
+    [...found].forEach(card => {
+      const container =
+        card.closest('.itemsContainer, emby-itemscontainer, [is="emby-itemscontainer"], .scrollSlider') ||
+        card.parentElement;
+      container?.querySelectorAll?.('.card').forEach(sibling => {
+        if (isDismissTargetCard(sibling)) {
+          found.add(sibling);
+        }
+      });
+    });
 
     return [...found];
   }
 
   function processResumeCards(root, reason) {
-    const cards = collectResumeCards(root);
+    const cards = collectTargetCards(root);
     let added = 0;
     cards.forEach(card => {
       if (addDismissButtonToCard(card)) {
@@ -234,7 +318,7 @@
     });
 
     if (added > 0 || reason === 'debug') {
-      console.log(`${LOG} scan(${reason || 'mutation'}): ${cards.length} resume card(s), added ${added}`);
+      console.log(`${LOG} scan(${reason || 'mutation'}): ${cards.length} target card(s), added ${added}`);
     }
 
     return { cards: cards.length, added };
@@ -255,7 +339,6 @@
         });
       }
 
-      // Some Jellyfin themes rewrite large home sections in one pass
       if (shouldScan) {
         processResumeCards(document, 'document');
       }
@@ -275,7 +358,7 @@
       const maxRetries = 30;
 
       const checkApiClient = () => {
-        if (window.ApiClient && window.ApiClient.accessToken && window.ApiClient.accessToken()) {
+        if (getApiClient()) {
           resolve();
           return;
         }
@@ -298,34 +381,33 @@
       await waitForApiClient();
       setupObserver();
 
-      // Home sections hydrate asynchronously
       [500, 1500, 3000, 6000, 10000].forEach(ms => {
         setTimeout(() => processResumeCards(document, `t+${ms}`), ms);
       });
 
-      // Expose manual debug helper in the browser console
       window.DismissContinueWatching = {
         version: VERSION,
         ready: true,
         rescan: () => processResumeCards(document, 'debug'),
         debug() {
-          const allCards = document.querySelectorAll('.card');
-          const withTicks = document.querySelectorAll('.card[data-positionticks], .card [data-positionticks]');
-          const withBar = document.querySelectorAll('.card .itemProgressBar, .card .cardProgressBar');
-          const buttons = document.querySelectorAll(`.${BTN_CLASS}`);
-          const sample = [...document.querySelectorAll('.card')].slice(0, 5).map(c => ({
-            id: c.getAttribute('data-id'),
-            ticks: c.getAttribute('data-positionticks'),
-            classes: c.className,
-            hasBar: !!c.querySelector('.itemProgressBar, .cardProgressBar'),
-          }));
+          const allCards = [...document.querySelectorAll('.card')];
           const result = {
             version: VERSION,
             allCards: allCards.length,
-            withTicks: withTicks.length,
-            withBar: withBar.length,
-            buttons: buttons.length,
-            sample,
+            withTicks: document.querySelectorAll('.card[data-positionticks]').length,
+            withResumeAction: document.querySelectorAll('.card [data-action="resume"]').length,
+            withBar: document.querySelectorAll('.card .itemProgressBar').length,
+            buttons: document.querySelectorAll(`.${BTN_CLASS}`).length,
+            targets: collectTargetCards(document).length,
+            sample: allCards.slice(0, 8).map(c => ({
+              id: c.getAttribute('data-id'),
+              type: c.getAttribute('data-type'),
+              ticks: c.getAttribute('data-positionticks'),
+              resume: !!c.querySelector('[data-action="resume"]'),
+              hasBar: !!c.querySelector('.itemProgressBar'),
+              target: isDismissTargetCard(c),
+              hasBtn: !!c.querySelector(`.${BTN_CLASS}`),
+            })),
           };
           console.log(`${LOG} debug`, result);
           processResumeCards(document, 'debug');
@@ -333,7 +415,7 @@
         },
       };
 
-      console.log(`${LOG} Ready v${VERSION} — run window.DismissContinueWatching.debug() if the button is missing`);
+      console.log(`${LOG} Ready v${VERSION} — run window.DismissContinueWatching.debug() if needed`);
     } catch (error) {
       console.error(`${LOG} Initialization aborted:`, error);
     }
