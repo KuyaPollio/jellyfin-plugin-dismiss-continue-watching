@@ -1,29 +1,30 @@
 # jellyfin-plugin-dismiss-continue-watching
 
-Dismiss items from Jellyfin's **Continue Watching** section by marking them as watched.
+Dismiss items from Jellyfin's **Continue Watching** section and keep them hidden across all clients.
 
-Derived from [jon4hz/jellyfin-plugin-discontinue-watching](https://github.com/jon4hz/jellyfin-plugin-discontinue-watching) (GPLv3), simplified to use Jellyfin's native played API instead of a custom denylist.
+Derived from [jon4hz/jellyfin-plugin-discontinue-watching](https://github.com/jon4hz/jellyfin-plugin-discontinue-watching) (GPLv3).
 
 ## About
 
-This plugin injects a dismiss (×) button on each Continue Watching card in the Jellyfin web UI. Clicking it:
+This plugin adds a dismiss (×) button on Continue Watching cards in the Jellyfin web UI. Clicking it:
 
-1. Marks the item as **played** for the current user (`POST /Users/{userId}/PlayedItems/{itemId}`)
-2. Removes the card from the page
+1. Adds the item to a per-user **denylist** (persisted server-side)
+2. Marks the item as played (best-effort, for immediate UI feedback)
+3. Removes the card from the page
 
-Your watch progress is replaced by a played status (same as marking the item watched manually).
+Dismissed items stay hidden after refresh. A built-in server middleware intercepts Resume API calls (`/UserItems/Resume`, `/Users/{id}/Items/Resume`) so the same denylist applies to **mobile and TV apps** — no reverse-proxy configuration required.
 
 ## Supported clients
 
-Works by injecting JavaScript into Jellyfin's web interface:
-
-- Jellyfin Web
-- Official Jellyfin Android / iOS / Desktop apps (web UI)
-- Not supported: pure third-party clients
+| Client | Dismiss button | Hidden after dismiss |
+|--------|----------------|----------------------|
+| Jellyfin Web | Yes | Yes |
+| Android / iOS / TV apps | No (no custom UI) | Yes |
+| Direct IP access | Yes (web) | Yes (all clients) |
 
 ## Requirements
 
-- [Jellyfin-JavaScript-Injector](https://github.com/n00bcodr/Jellyfin-JavaScript-Injector) (**required**)
+- [Jellyfin-JavaScript-Injector](https://github.com/n00bcodr/Jellyfin-JavaScript-Injector) (**required** for the web button)
 - [jellyfin-plugin-file-transformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation) (optional, recommended)
 
 ## Installation
@@ -52,7 +53,8 @@ Requires .NET SDK matching `global.json` (9.x).
 
 ## Credits
 
-- [jon4hz/jellyfin-plugin-discontinue-watching](https://github.com/jon4hz/jellyfin-plugin-discontinue-watching) — original plugin architecture, JS Injector registration, and Continue Watching button injection
+- [jon4hz/jellyfin-plugin-discontinue-watching](https://github.com/jon4hz/jellyfin-plugin-discontinue-watching) — denylist, Resume API override, JS Injector registration
+- [SloMR/jellyfin-plugin-dedupe-continue-watching](https://github.com/SloMR/jellyfin-plugin-dedupe-continue-watching) — middleware pattern for Resume API interception
 - [KefinTweaks](https://github.com/ranaldsgift/KefinTweaks) — Continue Watching UI patterns
 
 ## License

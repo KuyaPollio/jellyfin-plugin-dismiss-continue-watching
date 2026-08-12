@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const VERSION = '1.0.5';
+  const VERSION = '1.0.7';
   const LOG = '[DismissContinueWatching]';
   const BTN_CLASS = 'dismiss-continue-watching-button';
 
@@ -34,15 +34,30 @@
       align-items: center !important;
       justify-content: center !important;
       cursor: pointer !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45) !important;
+      transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease !important;
+    }
+
+    .card.dismiss-cw-host:hover .${BTN_CLASS},
+    .card.dismiss-cw-host:focus-within .${BTN_CLASS},
+    .${BTN_CLASS}:focus {
       opacity: 1 !important;
       pointer-events: auto !important;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45) !important;
     }
 
     .${BTN_CLASS}:hover,
     .${BTN_CLASS}:focus {
       background: rgba(198, 40, 40, 0.95) !important;
       transform: scale(1.06);
+    }
+
+    @media (hover: none) {
+      .${BTN_CLASS} {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
     }
 
     .${BTN_CLASS}:disabled {
@@ -156,23 +171,47 @@
     );
   }
 
+  function isContinueWatchingSection(card) {
+    const section = card.closest('.verticalSection');
+    if (!section) {
+      return false;
+    }
+
+    if (
+      section.querySelector(
+        'a[href*="type=Resume"], a[href*="type=resume"], a[href*="ResumeItems"]'
+      )
+    ) {
+      return true;
+    }
+
+    const title = section.querySelector('.sectionTitle, h2');
+    const titleText = (title?.textContent || '').toLowerCase();
+    return (
+      titleText.includes('continue watching') ||
+      titleText.includes('reprendre') ||
+      titleText.includes('continuer')
+    );
+  }
+
   function isResumeSignalCard(card) {
     if (!card?.getAttribute) {
       return false;
     }
 
-    const ticks =
-      card.getAttribute('data-positionticks') ||
-      card.querySelector('[data-positionticks]')?.getAttribute('data-positionticks');
+    const ticks = card.getAttribute('data-positionticks');
     if (ticks && ticks !== '0') {
       return true;
     }
 
-    if (card.querySelector('.itemProgressBar, .cardProgressBar, [is="emby-progressbar"]')) {
+    const progressBar = card.querySelector(
+      '.innerCardFooter .itemProgressBar, .innerCardFooter .cardProgressBar, .innerCardFooter [is="emby-progressbar"]'
+    );
+    if (progressBar && !card.querySelector('.playedIndicator')) {
       return true;
     }
 
-    if (card.querySelector('[data-action="resume"]')) {
+    if (card.querySelector('.cardOverlayContainer [data-action="resume"], .cardOverlayButton [data-action="resume"]')) {
       return true;
     }
 
@@ -185,28 +224,20 @@
     }
 
     const type = (card.getAttribute('data-type') || '').toLowerCase();
-    if (type === 'collectionfolder' || type === 'userview') {
+    if (
+      type === 'collectionfolder' ||
+      type === 'userview' ||
+      type === 'boxset' ||
+      type === 'playlist'
+    ) {
       return false;
     }
 
-    if (isResumeSignalCard(card)) {
-      return true;
-    }
-
-    const container =
-      card.closest('.itemsContainer, emby-itemscontainer, [is="emby-itemscontainer"], .scrollSlider') ||
-      card.parentElement;
-    if (!container) {
+    if (!isContinueWatchingSection(card)) {
       return false;
     }
 
-    for (const sibling of container.querySelectorAll('.card')) {
-      if (sibling !== card && isResumeSignalCard(sibling)) {
-        return true;
-      }
-    }
-
-    return false;
+    return isResumeSignalCard(card);
   }
 
   function filterDenylistedCards(root) {
@@ -327,22 +358,16 @@
       consider(scope);
     }
 
-    scope.querySelectorAll?.('.card[data-positionticks]').forEach(consider);
-    scope.querySelectorAll?.('.card .itemProgressBar, .card .cardProgressBar').forEach(el => consider(el));
-    scope.querySelectorAll?.('.card [data-action="resume"]').forEach(el => consider(el));
-
-    [...found].forEach(card => {
-      const container =
-        card.closest('.itemsContainer, emby-itemscontainer, [is="emby-itemscontainer"], .scrollSlider') ||
-        card.parentElement;
-      container?.querySelectorAll?.('.card').forEach(sibling => {
-        if (isDismissTargetCard(sibling)) {
-          found.add(sibling);
-        }
-      });
+    scope.querySelectorAll?.('.verticalSection a[href*="Resume"]').forEach(link => {
+      const section = link.closest('.verticalSection');
+      section?.querySelectorAll?.('.card[data-id]').forEach(consider);
     });
 
-    return [...found];
+    scope.querySelectorAll?.('.card[data-positionticks]').forEach(consider);
+    scope.querySelectorAll?.('.card .innerCardFooter .itemProgressBar').forEach(el => consider(el));
+    scope.querySelectorAll?.('.card [data-action="resume"]').forEach(el => consider(el));
+
+    return [...found].filter(isDismissTargetCard);
   }
 
   function processResumeCards(root, reason) {

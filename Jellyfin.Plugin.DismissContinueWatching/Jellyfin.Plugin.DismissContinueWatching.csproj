@@ -12,9 +12,9 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <PublishDeps>true</PublishDeps>
 
-    <AssemblyVersion>1.0.5.0</AssemblyVersion>
-    <FileVersion>1.0.5.0</FileVersion>
-    <PluginVersion>1.0.5</PluginVersion>
+    <AssemblyVersion>1.0.7.0</AssemblyVersion>
+    <FileVersion>1.0.7.0</FileVersion>
+    <PluginVersion>1.0.7</PluginVersion>
 
     <PackageId>Jellyfin.Plugin.DismissContinueWatching</PackageId>
     <Title>DismissContinueWatching</Title>
