@@ -20,7 +20,7 @@ public class ResumeOverrideStartupFilter : IStartupFilter
                 var middleware = new ResumeOverrideMiddleware(
                     _ => nextMiddleware(),
                     app.ApplicationServices.GetRequiredService<ILogger<ResumeOverrideMiddleware>>());
-                await middleware.InvokeAsync(context);
+                await middleware.InvokeAsync(context).ConfigureAwait(false);
             });
             next(app);
         };

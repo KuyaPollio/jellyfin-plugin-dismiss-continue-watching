@@ -1,7 +1,7 @@
 using System.Security.Claims;
-using Jellyfin.Extensions;
 using MediaBrowser.Controller.Dto;
 using MediaBrowser.Model.Entities;
+using MediaBrowser.Model.Querying;
 
 namespace Jellyfin.Plugin.DismissContinueWatching.Api.Extensions;
 
@@ -19,7 +19,7 @@ public static class DtoExtensions
     internal static DtoOptions AddClientFields(
         this DtoOptions dtoOptions, ClaimsPrincipal user)
     {
-        string? client = user.GetClient();
+        string? client = user.FindFirst("Jellyfin-Client")?.Value;
 
         if (string.IsNullOrEmpty(client))
         {
