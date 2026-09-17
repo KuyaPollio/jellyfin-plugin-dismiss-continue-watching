@@ -26,7 +26,7 @@ jobs:
           global-json-file: './global.json'
 
       - name: Restore dependencies
-        run: dotnet restore Jellyfin.Plugin.DiscontinueWatching.sln
+        run: dotnet restore Jellyfin.Plugin.DismissContinueWatching.sln
 
       - name: Install gitleaks
         run: |
