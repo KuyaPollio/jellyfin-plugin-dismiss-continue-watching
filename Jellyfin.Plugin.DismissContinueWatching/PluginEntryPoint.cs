@@ -49,10 +49,13 @@ public sealed class PluginEntryPoint : IHostedService
                 return;
             }
 
-            _logger.LogInformation(
-                "JavaScript Injector not ready (attempt {Attempt}/{Max}). Retrying...",
-                _registrationAttempts,
-                MaxRegistrationAttempts);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation(
+                    "JavaScript Injector not ready (attempt {Attempt}/{Max}). Retrying...",
+                    _registrationAttempts,
+                    MaxRegistrationAttempts);
+            }
             ScheduleRetry();
         }
         catch (Exception ex)

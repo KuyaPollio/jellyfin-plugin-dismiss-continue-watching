@@ -38,7 +38,11 @@ public class ResumeOverrideMiddleware
         var path = context.Request.Path.Value ?? string.Empty;
         if (TryGetRewritePath(path, out var rewritePath))
         {
-            _logger.LogDebug("Rewriting Resume request {From} -> {To}", path, rewritePath);
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Rewriting Resume request {From} -> {To}", path, rewritePath);
+            }
+
             context.Request.Path = new PathString(rewritePath);
         }
 

@@ -144,9 +144,12 @@ public class DismissContinueWatchingPlugin : BasePlugin<PluginConfiguration>, IH
 
                     if (unregisterResult is int removedCount)
                     {
-                        _logger.LogInformation(
-                            "Successfully unregistered {Count} script(s) from JavaScript Injector plugin.",
-                            removedCount);
+                        if (_logger.IsEnabled(LogLevel.Information))
+                        {
+                            _logger.LogInformation(
+                                "Successfully unregistered {Count} script(s) from JavaScript Injector plugin.",
+                                removedCount);
+                        }
                     }
                 }
             }

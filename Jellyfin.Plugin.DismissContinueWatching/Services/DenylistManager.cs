@@ -53,7 +53,10 @@ public class DenylistManager
 
             list.Add(normalized);
             DismissContinueWatchingPlugin.Instance?.SaveConfiguration();
-            _logger.LogInformation("Added item {ItemId} to dismiss denylist for user {UserId}", normalized, userId);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation("Added item {ItemId} to dismiss denylist for user {UserId}", normalized, userId);
+            }
         }
     }
 
@@ -91,7 +94,10 @@ public class DenylistManager
             }
 
             DismissContinueWatchingPlugin.Instance?.SaveConfiguration();
-            _logger.LogInformation("Removed item {ItemId} from dismiss denylist for user {UserId}", normalized, userId);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation("Removed item {ItemId} from dismiss denylist for user {UserId}", normalized, userId);
+            }
         }
     }
 

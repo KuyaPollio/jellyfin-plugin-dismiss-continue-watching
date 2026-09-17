@@ -41,9 +41,13 @@ public class PlaybackStartConsumer : IEventConsumer<PlaybackStartEventArgs>
 
             if (_denylistManager.Contains(userId, itemId))
             {
-                _logger.LogInformation(
-                    "Playback started for denylisted item {ItemId}; restoring to Continue Watching",
-                    itemId);
+                if (_logger.IsEnabled(LogLevel.Information))
+                {
+                    _logger.LogInformation(
+                        "Playback started for denylisted item {ItemId}; restoring to Continue Watching",
+                        itemId);
+                }
+
                 _denylistManager.Remove(userId, itemId);
             }
         }
