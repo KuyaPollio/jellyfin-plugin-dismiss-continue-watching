@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.0.9.0",
+        "changelog": "- See the full changelog at [GitHub](https://github.com/KuyaPollio/jellyfin-plugin-dismiss-continue-watching/releases/tag/v1.0.9)\n",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/KuyaPollio/jellyfin-plugin-dismiss-continue-watching/releases/download/v1.0.9/jellyfin-plugin-dismiss-continue-watching-1.0.9.zip",
+        "checksum": "837033b2f7f1befed9447fff068d0362",
+        "timestamp": "2026-09-17T13:11:16Z"
+      },
+      {
         "version": "1.0.8.0",
         "changelog": "- See the full changelog at [GitHub](https://github.com/KuyaPollio/jellyfin-plugin-dismiss-continue-watching/releases/tag/v1.0.8)\n",
         "targetAbi": "12.0.0.0",
