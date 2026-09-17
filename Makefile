@@ -35,7 +35,7 @@ restore:
 
 test: build
 	@echo "Testing build output..."
-	@if [ ! -f "Jellyfin.Plugin.DismissContinueWatching/bin/Release/net9.0/Jellyfin.Plugin.DismissContinueWatching.dll" ]; then \
+	@if [ ! -f "Jellyfin.Plugin.DismissContinueWatching/bin/Release/net10.0/Jellyfin.Plugin.DismissContinueWatching.dll" ]; then \
 		echo "Build test failed - DLL not found"; \
 		exit 1; \
 	fi

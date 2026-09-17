@@ -24,6 +24,7 @@ Dismissed items stay hidden after refresh. A built-in server middleware intercep
 
 ## Requirements
 
+- Jellyfin Server **12.0+**
 - [Jellyfin-JavaScript-Injector](https://github.com/n00bcodr/Jellyfin-JavaScript-Injector) (**required** for the web button)
 - [jellyfin-plugin-file-transformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation) (optional, recommended)
 
@@ -49,7 +50,7 @@ make build
 make package
 ```
 
-Requires .NET SDK matching `global.json` (9.x).
+Requires .NET SDK matching `global.json` (10.x) and Jellyfin Server 12.0+.
 
 ## Credits
 

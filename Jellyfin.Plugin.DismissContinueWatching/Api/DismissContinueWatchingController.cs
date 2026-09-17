@@ -270,6 +270,7 @@ public class DismissContinueWatchingController : ControllerBase
             MediaTypes = mediaTypes,
             IsVirtualItem = false,
             CollapseBoxSetItems = false,
+            IncludeOwnedItems = true,
             EnableTotalRecordCount = enableTotalRecordCount,
             AncestorIds = ancestorIds,
             IncludeItemTypes = includeItemTypes,
@@ -278,7 +279,12 @@ public class DismissContinueWatchingController : ControllerBase
             ExcludeItemIds = excludeItemIds
         });
 
-        var returnItems = _dtoService.GetBaseItemDtos(itemsResult.Items, dtoOptions, user);
+        IReadOnlyList<BaseItemDto> returnItems = _dtoService.GetBaseItemDtos(
+            itemsResult.Items,
+            dtoOptions,
+            user,
+            owner: null,
+            skipVisibilityCheck: true);
 
         return new QueryResult<BaseItemDto>(
             startIndex,
